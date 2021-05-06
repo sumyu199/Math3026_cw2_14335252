@@ -1,0 +1,215 @@
+---
+title: "Coursework2"
+author: "Sum Yu Ng"
+date: "03/05/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Time Series identification and estimation 
+## Nile time series dataset
+## Introduction
+In this report,I will identify,estimate and check of a the suitable model for the Nile dataset.
+
+## Nile Data
+First lets take a look at the Nile data.
+Nile data set is the measurements of the annual flow of the river Nile at Aswsan during 1871-1970.
+```{r}
+data("Nile")
+help("Nile")
+nile = Nile
+nile
+```
+
+Next,view the time series and observe whether the data appear reasonably stationary.
+```{r}
+#plot the time series 
+ts.plot(nile)
+```
+This is showing a stationary series.
+Also,the trends and changing levels rules out the series.
+```{r}
+acf(nile)
+```
+The acf shows the series is stationary.
+
+## Difference
+Difference the data using the command
+```{r}
+dnile = diff(nile)
+par(mfrow=c(2,2))
+ts.plot(dnile)
+acf(dnile)
+pacf(dnile)
+```
+From the ACF plot shows a gradually decaying autocorrelation to 0 as the lags increase for an AR process.
+For an MA process,the ACF will exhibit a jump to 0 after the qth lag so from the above ACF plot we can say that here is a MA(1)  compenent and there is also a second small pike it could be either MA(1) or MA(2).
+
+From the PACF plot,there is clearly an AR(1) component, due to a big spike at lag 1 in the pacf.
+There is also a small spike at lag 2.
+
+To be noted,the acf and pacf values can be treated as zero if they lie within the dotted blue lines and we only take the ones outside the blue lines into account.Although the second spike in the PACF plot is quite small. 
+So, perhaps it could either be an AR(1) or an AR(2).
+
+## fitting the model 
+In the following,we will try on (1,0,0) (2,0,0) (0,0,1) (0,0,2) first.
+Let’s fit an AR(1) to the difference data dnile. We use the arima command to fit the model by maximum likelihood.
+
+```{r}
+fit <- arima(dnile,order=c(1,0,0))
+fit
+```
+```{r}
+tsdiag(fit)
+```
+
+This is not a good fit, as the Ljung-Box p-values should nearly all be above the blue line at 0.05.
+
+Let’s now try fitting an AR(2).
+```{r}
+fit <- arima(dnile,order=c(2,0,0))
+fit
+```
+
+```{r}
+tsdiag(fit)
+```
+
+
+
+
+This does seem a reasonable fit. The p=values are all above the blue line (0.05) and the acf of the residuals (middle plot) looks like that of white noise.
+
+```{r}
+fit2 <- arima(dnile,order=c(0,0,1))
+fit2
+```
+```{r}
+tsdiag(fit2)
+```
+
+
+```{r}
+fit3 <- arima(dnile,order=c(0,0,2))
+fit3
+```
+```{r}
+tsdiag(fit3)
+```
+Both MA(1) and MA(2) are reasonable fit. The p=values are all above the blue line (0.05) and the acf of the residuals (middle plot) looks like that of white noise.
+
+Therefore,there were three models which fit well the differenced data, AR(2),MA(1) and MA(2),using acf and pacf.
+
+
+
+
+
+
+# Auto.ARIMA
+Now we will use the forecast library to choose a model using the information criteria. Let’s work with the original time series nile first.
+
+
+```{r}
+library(forecast)
+```
+
+
+```{r}
+fit4 <-auto.arima(nile,ic="aicc")
+fit4 
+```
+```{r}
+auto.arima(nile,ic="aic")
+```
+```{r}
+tsdiag(fit4)
+```
+
+
+```{r}
+fit5<- auto.arima(nile,ic="bic")
+fit5
+```
+
+```{r}
+tsdiag(fit5)
+```
+We can see that two different models,ARIMA(1,1,1) and ARIMA(0,1,1),are chosen by using the information criteria.
+
+Alternatively we could work with the first difference series dnile directly.
+```{r}
+library("forecast")
+auto.arima(dnile,ic="aicc")
+```
+
+```{r}
+fit6<-auto.arima(dnile,ic="aic")
+fit6
+```
+```{r}
+tsdiag(fit6)
+```
+
+```{r}
+fit7<- auto.arima(dnile,ic="bic")
+fit7
+```
+
+```{r}
+tsdiag(fit7)
+```
+# Investigation
+This leads to the same models being chosen.
+So, for this dataset there were five models which fit well to the differenced data. AR(2),MA(1),MA(2) [using acf, pacf] but but MA(2) has the biggest likelihood so it would be considered as the best model in the first session.
+
+Furthermore,ARIMA(1,1,1) and ARIMA(0,1,1) are the well fitting models for the dataset from the information criteria where ARIMA(1,1,1) is the having the largest likelihood.
+
+
+
+
+# Model Diagnosis
+
+```{r}
+library(FitAR)
+par(mfrow=c(1,3))
+acf(fit3$residuals)
+res <- LjungBoxTest(fit3$residuals, k=2, StartLag=1)
+plot(res[,3],main= "Ljung-Box Q Test", ylim =c(0,1),ylab= "P-values", xlab= "Lag")
+abline(h=0.05, col="blue")
+qqnorm(fit3$residuals)
+qqline(fit3$residuals)
+
+```
+
+
+
+
+```{r}
+library(FitAR)
+par(mfrow=c(1,3))
+acf(fit4$residuals)
+res <- LjungBoxTest(fit3$residuals, k=2, StartLag=1)
+plot(res[,3],main= "Ljung-Box Q Test", ylim =c(0,1),ylab= "P-values", xlab= "Lag")
+abline(h=0.05, col="blue")
+qqnorm(fit4$residuals)
+qqline(fit4$residuals)
+```
+
+
+# Conculsion 
+Based on these plots, we can see that for both models the Q-test plot have p-values above 0.05, then the ACF plot shows no significance between another lag, and finally, we can see that the QQ-Plot is almost fit into the line, so we can assume that is already normal. Therefore, we can use the MA(2) and ARIMA(1,1,1) to do the forecast in the future.
+
+
+
+
+
+
+
+
+
+
+
+
